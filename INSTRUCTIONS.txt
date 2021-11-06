@@ -1,0 +1,127 @@
+Name: Jonathan Toledano
+Phone: 050-694-4394
+Email: yonatanob@gmail.com
+
+
+Description:
+
+I'm using 3 DSs, i'll name them DS1,DS2,DS3 accordingly.
+1. url_trie (StringTrie) - for longest prefix - {url : RouteRule} - will be stored only when exact_match
+    parameter is False.
+                            Average Case:       Amortized Worst Case:
+    Set Item :              O(K)                O(n)
+    find longest prefix:    O(K)                O(n)
+                            *Where K in the size of the url parts (divided by '/')
+
+2. route_rules (dict) - for all the rules - {route rule UUID : RouteRule} - used for storing routing rule and
+    getting the in O(1)
+3. urls (dict) - for exact match - {url : RouteRule} - where url is normalized to handle the query params
+                            Average Case:       Amortized Worst Case:
+    Set Item :              O(1)                O(n)
+    k in d   :              O(1)                O(n)
+    Get Item :              O(1)                O(n)
+
+------------------------------------------------------------------------------------------------------------------------
+I'm inserting every route rule to DS2 and DS3 and if the exact_match parameter is False also insert to DS1.
+I'm normalizing urls to get a unique url - sorting the a set of query params when constructing instead of
+when searching. In this way I'm handling the different order of query params that equal the same target.
+The cost of sorting when constructing is more beneficial because now I can get the rule in time O(1) and I have only
+one unique url memory O(1), otherwise I need to use more memory space to handle the query params and
+the time complexity will be greater then O(1)
+(lets say, url + set of sets of query params).
+
+------------------------------------------------------------------------------------------------------------------------
+Server:
+
+command : python3 -m server
+
+I'm using "Flask".
+The there are 4 pages:
+1. '/' - get an input form user and finds it's target and redirect to it, else redirect to '/noMatch' page.
+    (using routing_resolver.resolve())
+2. '/create' - gets 3 inputs from user and sets the new routing rule in the DSs as explained before and
+    if the 'url' input is not valid then redirect to '/notValidInput' page.
+3. '/noMatch' - no match message to the user.
+4. '/notValidInput' - not a valid input message to the user.
+
+------------------------------------------------------------------------------------------------------------------------
+
+My functions:
+
+In main.routing_service:
+
+1. get(self, routing_rule_id: UUID) -> RouteRule:
+    get form a dictionary   O(1)
+    total time complexity   O(1)
+
+2. create(self, createRequest: CreateRouteRule) -> UUID:
+        set in dictionary       2*O(1) +
+        insert to trie          O(K) *Where K in the size of the url parts (divided by '/') +
+        normalize_url           O(qlog(q)) where q is the number of query params
+
+    total time complexity max(K,qlog(q))
+
+3. parse_url_params(self, url: str):
+    string op O(1) +
+    sorted(set(url_obj.url.query.split('&')))
+        split                   O(K)
+        turn a list to a set    O(K)
+        sorted                  O(qlog(q))
+
+    total time complexity max(K,qlog(q))
+
+4. normalize_url(self, url: str):
+        string op               O(1) +
+        parse_url_params        max(K,qlog(q)) where q is the number of query params
+
+    total time complexity max(K,qlog(q))
+
+5. validate_url(self, url: str):
+        checks if the required parameters exist O(C) where C is a constant thus O(1)
+
+    total time complexity O(1)
+
+
+
+In main.RoutingResolverService:
+
+1. resolve(self, url: str) -> UUID:
+        normalize_url           max(K,qlog(q)) +
+        _find_rule_by_url       O(1)           +
+        _find_rule_by_prefix    O(K)
+
+    total time complexity max(K,qlog(q))
+
+2. _find_rule_by_url(self, url: str):
+        find in dictionary      O(1)
+
+    total time complexity O(1)
+3. _find_rule_by_prefix(self, url: str):
+        find longest prefix    O(K) *Where K in the size of the url parts (divided by '/')
+    total time complexity O(K)
+
+Tests:
+command : python3 -m unittest discover -v test
+I added input validation tests and tests for functionality.
+
+------------------------------------------------------------------------------------------------------------------------
+
+
+Includes:
+main.__init__.py
+main.routing_resolver_service.py (edited)
+main.routing_rules.py
+main.routing_service.py(edited)
+
+test.__init__.py
+test.test_routing.py(edited - more tests)
+
+server.__init__.py
+server.__main__.py(edited)
+
+pip installs:
+
+pip install pydantic
+pip install pygtrie
+pip install uuid
+pip install flask
